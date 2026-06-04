@@ -165,22 +165,48 @@ def main():
         print(f"[ERROR] Source path does not exist: {game_folder}")
         sys.exit(1)
         
-    is_archive = any(game_folder.name.lower().endswith(ext) for ext in (".zip", ".rar", ".r00", ".001", "part1.rar"))
+    _is_zip = lambda p: p.name.lower().endswith(".zip")
+    _is_rar = lambda p: any(p.name.lower().endswith(ext) for ext in (".rar", ".r00", ".001", "part1.rar"))
+    is_archive = _is_zip(game_folder) or _is_rar(game_folder)
     
     import contextlib
     @contextlib.contextmanager
     def prepare_source_path(path: Path):
-        if is_archive:
-            try:
-                from mkpfs.archive_pack import stage_archive_source_root
-                with stage_archive_source_root(archive_path=path, password=args.password) as temp_root:
-                    yield temp_root
-            except ImportError:
-                print("[ERROR] MkPFS library not found or does not support archives.")
-                sys.exit(1)
-            except Exception as e:
-                print(f"[ERROR] Failed to extract archive: {e}")
-                sys.exit(1)
+        if _is_zip(path):
+            import tempfile, zipfile
+            with tempfile.TemporaryDirectory() as tmpdir:
+                try:
+                    with zipfile.ZipFile(path) as zf:
+                        # Path traversal validation (same logic MkPFS used)
+                        for member in zf.infolist():
+                            dest = Path(tmpdir) / member.filename
+                            try:
+                                dest.resolve().relative_to(Path(tmpdir).resolve())
+                            except ValueError:
+                                print(f"[ERROR] ZIP path traversal detected: {member.filename}")
+                                sys.exit(1)
+                        zf.extractall(tmpdir)
+                    yield Path(tmpdir)
+                except (zipfile.BadZipFile, RuntimeError) as exc:
+                    print(f"[ERROR] ZIP extraction failed: {exc}")
+                    sys.exit(1)
+        elif _is_rar(path):
+            import tempfile
+            from unrar import rarfile
+            with tempfile.TemporaryDirectory() as tmpdir:
+                try:
+                    with rarfile.RarFile(path, pwd=args.password) as rf:
+                        rf.extractall(tmpdir)
+                    yield Path(tmpdir)
+                except rarfile.RarWrongPassword:
+                    print("[ERROR] RAR extraction failed: wrong or missing password")
+                    sys.exit(1)
+                except rarfile.BadRarFile as exc:
+                    print(f"[ERROR] RAR extraction failed: {exc}")
+                    sys.exit(1)
+                except Exception as exc:
+                    print(f"[ERROR] Failed to extract archive: {exc}")
+                    sys.exit(1)
         else:
             yield path
 

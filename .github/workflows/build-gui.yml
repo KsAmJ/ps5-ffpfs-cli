@@ -25,11 +25,8 @@ jobs:
             target: Windows-x64
             artifact: PS5-FFPFS-CLI-Windows-x64.exe
           - os: macos-latest
-            target: macOS-arm64
-            artifact: PS5-FFPFS-CLI-macOS-arm64.zip
-          - os: macos-15-intel
-            target: macOS-x64
-            artifact: PS5-FFPFS-CLI-macOS-x64.zip
+            target: macOS-universal
+            artifact: PS5-FFPFS-CLI-macOS-universal.zip
           - os: ubuntu-latest
             target: Linux-x64
             artifact: PS5-FFPFS-CLI-Linux-x64.AppImage
@@ -46,9 +43,17 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
+      - name: Set up MSVC (Windows only)
+        if: matrix.os == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install dependencies
         run: |
-          uv pip install --system pyinstaller customtkinter mkpfs
+          uv pip install --system pyinstaller customtkinter mkpfs setuptools wheel
+
+      - name: Build unrar extension
+        run: |
+          uv pip install --system ./unrar
 
       - name: Generate dummy assets/icon.png
         shell: bash
@@ -73,7 +78,9 @@ jobs:
             --windowed \
             --hidden-import tkinter \
             --hidden-import mkpfs.cli \
-            --hidden-import rarfile \
+            --hidden-import unrar \
+            --hidden-import unrar.rarfile \
+            --hidden-import unrar._unrar \
             --collect-data tkinter \
             --collect-binaries tkinter \
             --collect-data customtkinter \
@@ -101,7 +108,9 @@ jobs:
             --osx-bundle-identifier com.bizkut.ps5-ffpfs-cli \
             --hidden-import tkinter \
             --hidden-import mkpfs.cli \
-            --hidden-import rarfile \
+            --hidden-import unrar \
+            --hidden-import unrar.rarfile \
+            --hidden-import unrar._unrar \
             --collect-data tkinter \
             --collect-binaries tkinter \
             --collect-data customtkinter \
@@ -135,7 +144,9 @@ jobs:
             --windowed \
             --hidden-import tkinter \
             --hidden-import mkpfs.cli \
-            --hidden-import rarfile \
+            --hidden-import unrar \
+            --hidden-import unrar.rarfile \
+            --hidden-import unrar._unrar \
             --collect-data tkinter \
             --collect-binaries tkinter \
             --collect-data customtkinter \

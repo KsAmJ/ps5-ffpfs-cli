@@ -10,6 +10,20 @@ __pycache__/
 *.pyc
 .venv/
 
+# Build artifacts
+build/
+dist/
+dist-gui/
+*.egg-info/
+*.so
+*.pyd
+*.dylib
+*.spec
+
+# Test artifacts
+.pytest_cache/
+test_data/
+
 # Local IDEs / system files
 .DS_Store
 .idea/
