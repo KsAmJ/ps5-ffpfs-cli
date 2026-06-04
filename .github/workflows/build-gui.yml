@@ -72,6 +72,8 @@ jobs:
             --onefile \
             --windowed \
             --hidden-import tkinter \
+            --hidden-import mkpfs.cli \
+            --hidden-import rarfile \
             --collect-data tkinter \
             --collect-binaries tkinter \
             --collect-data customtkinter \
@@ -98,6 +100,8 @@ jobs:
             --windowed \
             --osx-bundle-identifier com.bizkut.ps5-ffpfs-cli \
             --hidden-import tkinter \
+            --hidden-import mkpfs.cli \
+            --hidden-import rarfile \
             --collect-data tkinter \
             --collect-binaries tkinter \
             --collect-data customtkinter \
@@ -130,6 +134,8 @@ jobs:
             --onefile \
             --windowed \
             --hidden-import tkinter \
+            --hidden-import mkpfs.cli \
+            --hidden-import rarfile \
             --collect-data tkinter \
             --collect-binaries tkinter \
             --collect-data customtkinter \
