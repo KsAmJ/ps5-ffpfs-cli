@@ -32,3 +32,4 @@ test_data/
 # Local project tracking (not for sharing)
 RECOVERY.md
 PLAN.md
+/.vs

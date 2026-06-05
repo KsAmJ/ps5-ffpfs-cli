@@ -22,6 +22,9 @@ import re
 import tempfile
 from pathlib import Path
 
+# Use the directory the app is launched from for temporary files (same drive/folder)
+LAUNCH_DIR = Path(os.getcwd()).resolve()
+
 def get_title_id_from_name(name: str) -> str:
     # Look for standard PS4/PS5 title ID formats like PPSA12345 or CUSA12345
     match = re.search(r'\b([A-Z]{4}\d{5})\b', name, re.IGNORECASE)
@@ -105,18 +108,18 @@ def find_game_items(path: Path, batch: bool = False) -> list[Path]:
         
     return valid_items
 
-def pack_folder_uncompressed(game_folder: Path, pfs_path: Path, mkpfs_cmd_base: list[str], mkpfs_cwd: str | None):
+def pack_folder_uncompressed(game_folder: Path, pfs_path: Path, mkpfs_cmd_base: list[str], mkpfs_cwd: str | None, verify: bool = False):
     print(f"[INFO] Packing folder {game_folder.name} to uncompressed PFS image {pfs_path.name}...")
     cmd = mkpfs_cmd_base + [
         "pack", "folder",
         "--no-compress",
         "--no-adjust-output-file-extension",
         "--version", "PS5",
-        "--inode-bits", "32",
-        "--verify",
-        str(game_folder),
-        str(pfs_path)
+        "--inode-bits", "32"
     ]
+    if verify:
+        cmd.append("--verify")
+    cmd.extend([str(game_folder), str(pfs_path)])
     print(f"[INFO] Running: {' '.join(cmd)}")
     subprocess.run(cmd, cwd=mkpfs_cwd, check=True)
     print(f"[OK] Uncompressed PFS creation complete: {pfs_path}")
@@ -142,6 +145,7 @@ def main():
     parser.add_argument("--keep-pfs", action="store_true", help="Keep the intermediate nested PFS image (saved as <title_id>_nested_pfs.dat)")
     parser.add_argument("--batch", action="store_true", help="Process multiple game folders/files into multiple images. 'output' will be treated as the output directory.")
     parser.add_argument("--gui", action="store_true", help="Launch the graphical user interface")
+    parser.add_argument("--verify", action="store_true", help="Verify the PFS image integrity after creation (can be very slow for large files)")
     parser.add_argument("-f", "--force", "--overwrite", dest="overwrite", action="store_true", help="Overwrite existing files without prompting")
     parser.add_argument("--password", type=str, help="Optional password for ZIP/RAR archives")
     
@@ -161,6 +165,8 @@ def main():
                 app.keep_pfs_var.set(True)
             if args.batch:
                 app.batch_var.set(True)
+            if args.verify:
+                app.verify_var.set(True)
             root.mainloop()
             sys.exit(0)
         except ImportError:
@@ -187,7 +193,7 @@ def main():
     def prepare_source_path(path: Path):
         if _is_zip(path):
             import tempfile, zipfile
-            with tempfile.TemporaryDirectory() as tmpdir:
+            with tempfile.TemporaryDirectory(dir=str(LAUNCH_DIR)) as tmpdir:
                 try:
                     with zipfile.ZipFile(path) as zf:
                         # Path traversal validation (same logic MkPFS used)
@@ -206,7 +212,7 @@ def main():
         elif _is_rar(path):
             import tempfile
             from unrar import rarfile
-            with tempfile.TemporaryDirectory() as tmpdir:
+            with tempfile.TemporaryDirectory(dir=str(LAUNCH_DIR)) as tmpdir:
                 try:
                     with rarfile.RarFile(path, pwd=args.password) as rf:
                         rf.extractall(tmpdir)
@@ -316,11 +322,11 @@ def main():
                 compress_file_to_ffpfsc(item, current_ffpfs_path, mkpfs_cmd_base, mkpfs_cwd)
             else:
                 # Game folder: pack to uncompressed PFS first, then compress to .ffpfsc
-                with tempfile.TemporaryDirectory() as temp_dir:
+                with tempfile.TemporaryDirectory(dir=str(LAUNCH_DIR)) as temp_dir:
                     temp_pfs = Path(temp_dir) / "pfs_image.dat"
                     
                     # 1. Pack folder into the uncompressed PFS image
-                    pack_folder_uncompressed(item, temp_pfs, mkpfs_cmd_base, mkpfs_cwd)
+                    pack_folder_uncompressed(item, temp_pfs, mkpfs_cmd_base, mkpfs_cwd, verify=args.verify)
                     
                     # 2. Compress that PFS image file into the final .ffpfsc
                     compress_file_to_ffpfsc(temp_pfs, current_ffpfs_path, mkpfs_cmd_base, mkpfs_cwd)
